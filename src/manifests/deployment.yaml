@@ -1,0 +1,42 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab-dev-ci-demo
+  namespace: gitlab
+  labels:
+    app: gitlab-dev-ci
+    track: stable
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gitlab-dev-ci
+  template:
+    metadata:
+      labels:
+        app: gitlab-dev-ci
+        track: stable
+    spec:
+      imagePullSecrets:
+        - name: myregistry
+      containers:
+        - name: app
+          image: twang2218/gitlab-ce-zh:10.6.2 #镜像
+          imagePullPolicy: Always
+          ports:
+            - name: http-metrics
+              protocol: TCP
+              containerPort: 8000
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            timeoutSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 3
+            timeoutSeconds: 2
