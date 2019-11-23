@@ -1,0 +1,183 @@
+# 新的 .gitlab-ci.yml 文件可以复制这个文件, 修改下面几个地方即可
+#
+# 1. variables 里的变量的值
+# 2. deploy_beta, deploy_pre, deploy_prod 里的 IP 地址
+
+image: docker-registry.keke.net/gitlab-ci/golang:latest
+
+variables:
+  PROGRAM_NAME: kubernetes-application # 一般等同于仓库的名称
+  SERVICE_NAME: kubernetes-application-service # 等同于 supervisor command 最后一部分
+  GO_FMT_LOCAL: ${PROGRAM_NAME} # goimports 的 local 参数
+
+stages:
+  - build
+  - deploy
+
+
+fmt:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - merge_requests
+  script:
+    - echo "GO_FMT_LOCAL=${GO_FMT_LOCAL}"
+    - gofmt.sh "${GO_FMT_LOCAL}"
+
+
+lint:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - merge_requests
+  script:
+    - golint.sh
+
+
+vet:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - merge_requests
+  before_script:
+    - export GOPATH="/opt/cache/gopath"
+    - export GOCACHE="/opt/cache/gocache"
+    - export GOTMPDIR="/opt/cache/gotmpdir"
+  script:
+    - go vet ./...
+
+
+test:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - merge_requests
+  script:
+    - echo "TODO run test"
+
+build-race:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - master
+  before_script:
+    - export GOPATH="/opt/cache/gopath"
+    - export GOCACHE="/opt/cache/gocache"
+    - export GOTMPDIR="/opt/cache/gotmpdir"
+  script:
+    - echo $(go version)
+    # -race requires cgo
+    - go build -race -v -o "build/${SERVICE_NAME}"
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 week
+
+build-no-race:
+  stage: build
+  tags:
+    - k8s
+  only:
+    - pre-release
+    - release
+  before_script:
+    - export GOPATH="/opt/cache/gopath"
+    - export GOCACHE="/opt/cache/gocache"
+    - export GOTMPDIR="/opt/cache/gotmpdir"
+  script:
+    - echo $(go version)
+    - CGO_ENABLED=0 go build -v -o "build/${SERVICE_NAME}"
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 week
+
+
+image_build:
+  stage: release
+  image: docker:latest
+  variables:
+    DOCKER_DRIVER: overlay
+    DOCKER_HOST: tcp://localhost:2375
+  services:
+    - name: docker:17.03-dind
+      command: ["--insecure-registry=registry.qikqiak.com"]
+  script:
+    - docker info
+    - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" registry.keke.com
+    - docker build -t "${CI_REGISTRY_IMAGE}:latest" .
+    - docker tag "${CI_REGISTRY_IMAGE}:latest" "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}"
+    - test ! -z "${CI_COMMIT_TAG}" && docker push "${CI_REGISTRY_IMAGE}:latest"
+    - docker push "${CI_REGISTRY_IMAGE}:${CI_COMMIT_REF_NAME}"
+
+deploy_review:
+  image: keke/kubectl
+  stage: review
+  only:
+    - branches
+  except:
+    - tags
+  environment:
+    name: dev
+    url: https://gitlab-dev-ci-demo.com
+    on_stop: stop_review
+  script:
+    - kubectl version
+    - cd manifests/
+    - sed -i "s/__CI_ENVIRONMENT_SLUG__/${CI_ENVIRONMENT_SLUG}/" deployment.yaml ingress.yaml service.yaml
+    - sed -i "s/__VERSION__/${CI_COMMIT_REF_NAME}/" deployment.yaml ingress.yaml service.yaml
+    - |
+      if kubectl apply -f deployment.yaml | grep -q unchanged; then
+          echo "=> Patching deployment to force image update."
+          kubectl patch -f deployment.yaml -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"ci-last-updated\":\"$(date +'%s')\"}}}}}"
+      else
+          echo "=> Deployment apply has changed the object, no need to force image update."
+      fi
+    - kubectl apply -f service.yaml || true
+    - kubectl apply -f ingress.yaml
+    - kubectl rollout status -f deployment.yaml
+    - kubectl get all,ing -l ref=${CI_ENVIRONMENT_SLUG}
+
+stop_review:
+  image: keke/kubectl
+  stage: review
+  variables:
+    GIT_STRATEGY: none
+  when: manual
+  only:
+    - branches
+  except:
+    - master
+    - tags
+  environment:
+    name: dev
+    action: stop
+  script:
+    - kubectl version
+    - kubectl delete ing -l ref=${CI_ENVIRONMENT_SLUG}
+    - kubectl delete all -l ref=${CI_ENVIRONMENT_SLUG}
+
+deploy_live:
+  image: keke/kubectl
+  stage: deploy
+  environment:
+    name: live
+    url: https://gitlab-dev-ci-demo.com
+  only:
+    - tags
+  when: manual
+  script:
+    - kubectl version
+    - cd manifests/
+    - sed -i "s/__CI_ENVIRONMENT_SLUG__/${CI_ENVIRONMENT_SLUG}/" deployment.yaml ingress.yaml service.yaml
+    - sed -i "s/__VERSION__/${CI_COMMIT_REF_NAME}/" deployment.yaml ingress.yaml service.yaml
+    - kubectl apply -f deployment.yaml
+    - kubectl apply -f service.yaml
+    - kubectl apply -f ingress.yaml
+    - kubectl rollout status -f deployment.yaml
+    - kubectl get all,ing -l ref=${CI_ENVIRONMENT_SLUG}
