@@ -1,8 +1,3 @@
-# 新的 .gitlab-ci.yml 文件可以复制这个文件, 修改下面几个地方即可
-#
-# 1. variables 里的变量的值
-# 2. deploy_beta, deploy_pre, deploy_prod 里的 IP 地址
-
 image: docker-registry.keke.net/gitlab-ci/golang:latest
 
 variables:
