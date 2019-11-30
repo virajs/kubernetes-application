@@ -209,8 +209,6 @@ kube-system   monitoring-influxdb    ClusterIP   10.97.131.84     <none>        
 > kubectl scale --replicas=5 rc/foo rc/bar rc/baz                   # Scale multiple replication controllers
 ```
 
-
-
 22. 删除资源
 ```bash
 > kubectl delete -f ./pod.json                                              # 删除 pod.json 文件中定义的类型和名称的 pod

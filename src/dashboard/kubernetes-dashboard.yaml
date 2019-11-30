@@ -12,11 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Configuration to deploy release version of the Dashboard UI compatible with
-# Kubernetes 1.8.
-#
-# Example usage: kubectl create -f <this_file>
-
 # ------------------- Dashboard Secret ------------------- #
 
 apiVersion: v1
@@ -48,11 +43,11 @@ metadata:
   name: kubernetes-dashboard-minimal
   namespace: kube-system
 rules:
-  # Allow Dashboard to create 'kubernetes-dashboard2-key-holder' secret.
+  # Allow Dashboard to create 'kubernetes-dashboard-key-holder' secret.
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create"]
-  # Allow Dashboard to create 'kubernetes-dashboard2-settings' config map.
+  # Allow Dashboard to create 'kubernetes-dashboard-settings' config map.
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["create"]
@@ -61,7 +56,7 @@ rules:
   resources: ["secrets"]
   resourceNames: ["kubernetes-dashboard-key-holder", "kubernetes-dashboard-certs"]
   verbs: ["get", "update", "delete"]
-  # Allow Dashboard to get and update 'kubernetes-dashboard2-settings' config map.
+  # Allow Dashboard to get and update 'kubernetes-dashboard-settings' config map.
 - apiGroups: [""]
   resources: ["configmaps"]
   resourceNames: ["kubernetes-dashboard-settings"]
@@ -95,7 +90,7 @@ subjects:
 # ------------------- Dashboard Deployment ------------------- #
 
 kind: Deployment
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   labels:
     k8s-app: kubernetes-dashboard
@@ -114,13 +109,12 @@ spec:
     spec:
       containers:
       - name: kubernetes-dashboard
-        image: mirrorgooglecontainers/kubernetes-dashboard-amd64:v1.8.3
+        image: k8s.gcr.io/kubernetes-dashboard-amd64:v1.10.1
         ports:
         - containerPort: 8443
           protocol: TCP
         args:
           - --auto-generate-certificates
-          - --authentication-mode=basic
           # Uncomment the following line to manually specify Kubernetes API server Host
           # If not specified, Dashboard will attempt to auto discover the API server and connect
           # to it. Uncomment only if the default does not work.
@@ -163,8 +157,8 @@ metadata:
 spec:
   type: NodePort
   ports:
-    - port: 80
+    - port: 443
       targetPort: 8443
-      nodePort: 30000
+      nodePort: 32631
   selector:
     k8s-app: kubernetes-dashboard
