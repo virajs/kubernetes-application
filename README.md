@@ -266,3 +266,10 @@ data:
   username: $(echo "jane" | base64)
 EOF
 ```
+
+#### Kubernetes Deployment 故障排查常见方法
+
+
+<p align="center">
+<img width="800" align="center" src="src/images/1.jpg" />
+</p>
