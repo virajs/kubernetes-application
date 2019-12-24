@@ -481,6 +481,7 @@ spec:
 那么我们应该如何测试 Ingress 是否正常工作呢？你可以使用与以前相同的策略kubectl port-forward，但是这次你应该连接到 Ingress 控制器，而不是连接到 Service。
 
 首先，使用以下命令检索 Ingress 控制器的 Pod 名称：
+
 ```bash
 > kubectl get pods --all-namespaces
 NAMESPACE   NAME                              READY STATUS
@@ -556,8 +557,8 @@ app3-76f9fcd46b-xbv4k   1/1   Running           1         47h
 
 * kubectl exec -it bash 在 Pod 的一个容器中运行交互式命令很有用.
 
+#### 常见 Pod 错误
 
-常见 Pod 错误
 
 Pod 可能会出现启动和运行时错误。启动错误包括：
 
