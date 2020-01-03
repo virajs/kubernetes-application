@@ -346,6 +346,7 @@ spec:
 
 在进行调试之前，让我们回顾一下这三个组件是如何相互关联的。让我们先从 Deployment 和 Service 开始。
 
+
 #### 连接 Deployment 和 Service
 
 值得注意的是，Service 和 Deployment 之间其实根本没有连接。事实是：Service 直接指向 Pod，并完全跳过了Deployment。
@@ -430,7 +431,6 @@ spec:
 * 80 是 service 通过 port 字段暴露的端口.
 
 如果可以连接，则说明设置正确。如果不行，则很可能是你填写了错误的标签或端口不匹配。
-
 
 #### 连接 Service 和 Ingress
 
