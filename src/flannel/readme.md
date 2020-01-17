@@ -48,6 +48,13 @@ Docker采用插件化的网络模式，默认提供`bridge`、`host`、`none`、
 
 * Network plugins：可以安装和使用第三方的网络插件。可以在Docker Store或第三方供应商处获取这些插件。
 
+然而docker的网络模式又分为单机模式和多机模式:
+
+* 单主机网络模式 bridge、host、none、container
+
+* 多主机网络模式 overlay、macvlan、flannel
+
+
 下面我们分别来分析下docker的网络模式.
 
 #### bridge网络模式
@@ -272,3 +279,107 @@ Docker Container的host网络模式在实现过程中，由于不需要额外的
 网络环境为none，即不为Docker Container任何的网络环境。一旦Docker Container采用了none网络模式，那么容器内部就只能使用loopback网络设备，不会再有其他的网络资源。
 
 可以说none模式为Docker Container做了极少的网络设定，但是俗话说得好“少即是多”，在没有网络配置的情况下，作为Docker开发者，才能在这基础做其他无限多可能的网络定制开发。这也恰巧体现了Docker设计理念的开放。
+
+#### container网络模式
+
+该模式类似于host模式，只不过host模式是主机与容器共享Network Namespace,而container模式是容器之间共享Network Namespace。
+
+新创建的容器不会创建自己的网卡，配置自己的 IP，而是和一个指定的容器共享 IP、端口范围等。同样，两个容器除了网络方面，其他的如文件系统、进程列表等还是隔离的。两个容器的进程可以通过 lo 网卡设备通信。
+
+其配置方式为`--net=container:<name_or_id>`
+
+#### overlay网络模式
+
+<p align="center">
+<img width="600" align="center" src="src/images/8.jpg" />
+</p>
+
+overlay网络可以实现跨主机的容器VLAN，主要用于 docker swarm 上，docker 文档中也基本是两者同时出现，因此docker swarm是跨主机的容器与容器之间的官方标准通信方案。
+
+容器在两个跨主机进行通信的时候，是使用overlay network这个网络模式进行通信，如果使用host也可以实现跨主机进行通信，直接使用这个物理的ip地址就可以进行通信。
+
+overlay它会虚拟出一个网络比如10.0.9.3这个ip地址，在这个overlay网络模式里面，有一个类似于服务网关的地址，然后把这个包转发到物理服务器这个地址，最终通过路由和交换，到达另一个服务器的ip地址。
+
+那么,在docker容器里面overlay 是怎么实现的呢？
+
+我们会有一个服务发现，比如说是consul，会定义一个ip地址池，比如10.0.9.0/24之类的，上面会有容器，容器的ip地址会从上面去获取，获取完了后，会通过eth1进行通信，贼这实现跨主机的东西。
+
+<p align="center">
+<img width="600" align="center" src="src/images/9.jpg" />
+</p>
+
+需要创建一个consul的服务容器:
+
+```bash
+> docker run -d -p 8400:8400 -p 8500:8500 -p 8600:53/udp -h consul progrium/consul -server -bootstrap -ui-dir /ui
+```
+修改它的启动参数:
+```bash
+> ExecStart=/usr/bin/docker daemon -H tcp://0.0.0.0:2376 -H unix:///var/run/docker.sock --cluster-store=consul://192.168.59.100:8500 --cluster-advertise=enp0s8:2376 --insecure-registry=0.0.0.0/0
+```
+注意这里,hostA和hostB都需要修改.
+
+#### macvlan网络模式
+
+macvlan模式可以创建出一个新的自定义模式，其新启动的容器可以按新的模式配置网络环境。
+    
+查看网络模式:
+```bash
+>  docker network ls
+NETWORK ID          NAME                  DRIVER              SCOPE
+3fb4debc2c4f        apollo_default        bridge              local
+ccc8612439ed        bridge                bridge              local
+2da252aafa83        deployments_default   bridge              local
+19d49c5334fc        etcd-manage_default   bridge              local
+e2e60f36631e        host                  host                local
+211e521edd2b        none                  null                local
+```
+
+创建新的macvlan:
+```bash
+> docker network create -d macvlan  --subnet=192.168.100.0/24 --gateway=192.168.100.1 -o parent=ens33 macvlan-net
+```
+
+```bash
+> docker run --net=gitlab-net --ip=192.168.111.201 -dit --name mysql keke-mysql
+```
+
+因此就可以创建新的容器，通过--net=macvlan-net指定其为新的模式,--ip参数指定容器ip。
+
+相对于前面几种模式，该模式更加灵活，可根据实际需求配置出新的模式，满足较为复杂的网络需求。
+
+
+#### kubernetes的flannel网络模式
+
+上面分析了那么的docker的网络模式,那么在k8s下面的flannel网络模式是什么样呢?
+
+Flannel是CoreOS团队针对Kubernetes设计的一个网络规划服务，简单来说，它的功能是让集群中的不同节点主机创建的Docker容器都具有全集群唯一的虚拟IP地址。
+
+在默认的Docker配置中，每个节点上的Docker服务会分别负责所在节点容器的IP分配。这样导致的一个问题是，不同节点上容器可能获得相同的内外IP地址。并使这些容器之间能够之间通过IP地址相互找到，也就是相互ping通。
+
+Flannel的设计目的就是为集群中的所有节点重新规划IP地址的使用规则，从而使得不同节点上的容器能够获得“同属一个内网”且”不重复的”IP地址，并让属于不同节点上的容器能够直接通过内网IP通信。
+
+Flannel为每个主机提供独立的子网，整个集群的网络信息存储在etcd上。对于跨主机的转发，目标容器的IP地址，需要从etcd获取。
+
+Flannel利用Kubernetes API或者etcd用于存储整个集群的网络配置，其中最主要的内容为设置集群的网络地址空间。例如，设定整个集群内所有容器的IP都取自网段“10.1.0.0/16”。
+
+Flannel实质上是一种“覆盖网络(overlaynetwork)”，也就是将TCP数据包装在另一种网络包里面进行路由转发和通信，目前已经支持udp、vxlan、host-gw、aws-vpc、gce和alloc路由等数据转发方式，默认的节点间数据通信方式是UDP转发。
+
+Flannel在每个主机中运行Flanneld作为agent，它会为所在主机从集群的网络地址空间中，获取一个小的网段subnet，本主机内所有容器的IP地址都将从中分配。
+
+Flanneld再将本主机获取的subnet以及用于主机间通信的Public IP，同样通过kubernetes API或者etcd存储起来。
+
+Flannel利用各种backend ，例如udp，vxlan，host-gw等等，跨主机转发容器间的网络流量，完成容器间的跨主机通信。
+
+
+
+简单总结Flannel的特点:
+
+1. 使集群中的不同Node主机创建的Docker容器都具有全集群唯一的虚拟IP地址。
+
+2. 建立一个覆盖网络（overlay network），通过这个覆盖网络，将数据包原封不动的传递到目标容器。覆盖网络是建立在另一个网络之上并由其基础设施支持的虚拟网络。覆盖网络通过将一个分组封装在另一个分组内来将网络服务与底层基础设施分离。在将封装的数据包转发到端点后，将其解封装。
+
+3. 创建一个新的虚拟网卡flannel0接收docker网桥的数据，通过维护路由表，对接收到的数据进行封包和转发（vxlan）。
+
+4. etcd保证了所有node上flanned所看到的配置是一致的。同时每个node上的flanned监听etcd上的数据变化，实时感知集群中node的变化。
+
