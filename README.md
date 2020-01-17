@@ -711,6 +711,7 @@ kube-system nginx-ingress-controller-6fc5bcc  1/1   Running
 ```
 
 然后描述它以获取 Ingress 控制器 Pod 的端口：
+
 ```bash
 > kubectl describe pod nginx-ingress-controller-6fc5bcc
    --namespace kube-system \
@@ -718,6 +719,7 @@ kube-system nginx-ingress-controller-6fc5bcc  1/1   Running
 ```
 
 最后，连接到 Pod：
+
 ```bash
 > kubectl port-forward nginx-ingress-controller-6fc5bcc 3000:80 --namespace kube-system
 ```
@@ -746,6 +748,7 @@ Ingress-nginx 项目有一个 Kubectl 的[官方插件](https://kubernetes.githu
 * `kubectl ingress-nginx lint`，它会检查 `nginx.conf` 配置
 * `kubectl ingress-nginx backend`，它会检查后端（类似于`kubectl describe ingress`）
 * `kubectl ingress-nginx logs`，查看日志
+
 请注意，你可能需要为 Ingress 控制器指定正确的名称空间 `namespace`。
 
 
