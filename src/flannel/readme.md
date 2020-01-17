@@ -372,8 +372,7 @@ Flanneld再将本主机获取的subnet以及用于主机间通信的Public IP，
 Flannel利用各种backend ，例如udp，vxlan，host-gw等等，跨主机转发容器间的网络流量，完成容器间的跨主机通信。
 
 
-
-简单总结Flannel的特点:
+Flannel的特点:
 
 1. 使集群中的不同Node主机创建的Docker容器都具有全集群唯一的虚拟IP地址。
 
@@ -382,4 +381,76 @@ Flannel利用各种backend ，例如udp，vxlan，host-gw等等，跨主机转�
 3. 创建一个新的虚拟网卡flannel0接收docker网桥的数据，通过维护路由表，对接收到的数据进行封包和转发（vxlan）。
 
 4. etcd保证了所有node上flanned所看到的配置是一致的。同时每个node上的flanned监听etcd上的数据变化，实时感知集群中node的变化。
+
+
+Flannel对网络要求提出的解决办法:
+
+互相不冲突的ip:
+
+1.flannel利用Kubernetes API或者etcd用于存储整个集群的网络配置，根据配置记录集群使用的网段。
+
+2.flannel在每个主机中运行flanneld作为agent，它会为所在主机从集群的网络地址空间中，获取一个小的网段subnet，本主机内所有容器的IP地址都将从中分配。
+
+如测试环境中ip分配：
+
+1. master1节点
+```bash
+> cat /run/flannel/subnet.env
+FLANNEL_NETWORK=10.244.0.0/16
+FLANNEL_SUBNET=10.244.0.1/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+2. master2节点
+```bash
+> cat /run/flannel/subnet.env
+FLANNEL_NETWORK=10.244.0.0/16
+FLANNEL_SUBNET=10.244.1.1/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+3. master3节点
+```bash
+> cat /run/flannel/subnet.env
+FLANNEL_NETWORK=10.244.0.0/16
+FLANNEL_SUBNET=10.244.2.1/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+4. node1节点
+```bash
+> cat /run/flannel/subnet.env
+FLANNEL_NETWORK=10.244.0.0/16
+FLANNEL_SUBNET=10.244.4.1/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+5. node2节点
+```bash
+> cat /run/flannel/subnet.env
+  FLANNEL_NETWORK=10.244.0.0/16
+  FLANNEL_SUBNET=10.244.5.1/24
+  FLANNEL_MTU=1450
+  FLANNEL_IPMASQ=true
+```
+
+6. node3节点
+```bash
+> cat /run/flannel/subnet.env
+FLANNEL_NETWORK=10.244.0.0/16
+FLANNEL_SUBNET=10.244.6.1/24
+FLANNEL_MTU=1450
+FLANNEL_IPMASQ=true
+```
+
+在flannel network中，每个pod都会被分配唯一的ip地址，且每个K8s node的subnet各不重叠，没有交集。
+
+Pod之间互相访问:
+
+* flanneld将本主机获取的subnet以及用于主机间通信的Public IP通过etcd存储起来，需要时发送给相应模块。
+* flannel利用各种backend mechanism，例如udp，vxlan等等，跨主机转发容器间的网络流量，完成容器间的跨主机通信。
 
