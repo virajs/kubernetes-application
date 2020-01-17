@@ -375,17 +375,20 @@ Kubernetes使用token进行用户认证，为了正确访问Dashboard，需要�
 
 
 #### kubectl proxy方式
+
 ```bash
 > kubectl proxy 
 Starting to serve on 127.0.0.1:8001
 ```
 
 现在就可以通过以下链接来访问Dashborad UI:
+
 `http://localhost:8001/api/v1/namespaces/kube-system/services/https:kubernetes-dashboard:/proxy/`
 
 这种方式默认情况下，只能从本地访问（启动它的机器）。
 
 我们也可以使用–address和–accept-hosts参数来允许外部访问：
+
 ```bash
 > kubectl proxy --address='0.0.0.0'  --accept-hosts='^*$'
 Starting to serve on [::]:8001
