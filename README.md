@@ -1,6 +1,6 @@
 ### kubernetes-application
 
-kubernetes 命令集合
+kubernetes命令集合
 
 1. 用来显示当前的各种用户进程限制
 
