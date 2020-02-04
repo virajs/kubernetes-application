@@ -152,3 +152,19 @@ appdatadir=/var/data
 需要说明的是，环境变量的名称受POSIX命名规范（[a-zA-Z_][a-zA-Z0-9_]*）约束，不能以数字开头。
 
 如果包含非法字符，则系统将跳过该条环境变量的创建，并记录一个Event来描述环境变量无法生成，但不会阻止Pod的启动
+
+#### 使用ConfigMap的限制条件
+
+使用ConfigMap的限制条件如下：
+
+* ConfigMap必须在Pod之前创建（除非您把 ConfigMap 标志成”optional”）。如果您引用了一个不存在的 ConfigMap， 那这个Pod是无法启动的。就像引用了不存在的 Key 会导致 Pod 无法启动一样。
+
+* ConfigMap受Namespace限制，只有处于相同的Namespace中的Pod可以引用它；
+
+* ConfigMap中的配额管理还未能实现；
+
+* kubelet值支持可以被API Server管理的Pod使用ConfigMap。kubelet在当前Node上通过 `--manifest-url`或 `--config` 自动创建的静态Pod将无法引用ConfigMap；
+
+* 在Pod对ConfigMap进行挂载（volumeMount）操作是，容器内部只能挂载为目录，无法挂载为文件。
+
+* 在挂载到容器内部后，目录中将包含ConfigMap定义的每个item，如果该目录下原理还有其他文件，则容器内的该目录会被挂载的ConfigMap覆盖。
