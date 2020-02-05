@@ -71,7 +71,7 @@ kubectl get configmap test -o yaml
 * 通过环境变量获取ConfigMap
 * 通过Volume挂载的方式将ConfigMap中的内容挂载为容器内部的文件或目录
 
-在Pod中使用ConfigMap:
+#### 在Pod中使用ConfigMap
 
 1. 创建一个 `test.yaml`,通过环境变量方式使用ConfigMap.
 
@@ -152,6 +152,94 @@ appdatadir=/var/data
 需要说明的是，环境变量的名称受POSIX命名规范（[a-zA-Z_][a-zA-Z0-9_]*）约束，不能以数字开头。
 
 如果包含非法字符，则系统将跳过该条环境变量的创建，并记录一个Event来描述环境变量无法生成，但不会阻止Pod的启动
+
+#### 通过volumeMount使用ConfigMap
+
+当使用 `--from-file` 创建 ConfigMap 时， 文件名将作为键名保存在 ConfigMap 的 data 段，文件的内容变成键值。
+
+从 ConfigMap 里的数据生成一个卷
+
+我们通过一个名为 special-config 的 ConfigMap 的配置来熟悉下.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: special-config
+  namespace: default
+data:
+  special.level: very
+  special.type: charm
+```
+
+在 Pod 的配置文件里的 volumes 段添加 ConfigMap 的名字。
+
+这会将 ConfigMap 数据添加到 `volumeMounts.mountPath` 指定的目录里面（在这个例子里是 /etc/config）。command 段引用了 ConfigMap 里的 special.level.
+
+```yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-test-pod
+spec:
+  containers:
+    - name: test-container
+      image: gcr.io/google_containers/busybox
+      command: [ "/bin/sh", "-c", "ls /etc/config/" ]
+      volumeMounts:
+      - name: config-volume
+        mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        # Provide the name of the ConfigMap containing the files you want
+        # to add to the container
+        name: special-config
+  restartPolicy: Never
+```
+Pod 运行起来后, 运行：
+
+```bash
+> ls /etc/config/
+
+special.level
+special.type
+```
+
+#### 添加 ConfigMap 数据到卷里指定路径
+
+使用 path 变量定义 ConfigMap 数据的文件路径。在我们这个例子里，special.level 将会被挂载在 config-volume 的文件 `/etc/config/keys` 下.
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-test-pod
+spec:
+  containers:
+    - name: test-container
+      image: gcr.io/google_containers/busybox
+      command: [ "/bin/sh","-c","cat /etc/config/keys" ]
+      volumeMounts:
+      - name: config-volume
+        mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: special-config
+        items:
+        - key: special.level
+          path: keys
+  restartPolicy: Never
+```
+Pod 运行起来后，运行：
+
+```bash
+> cat /etc/config/keys
+
+very
+```
 
 #### 使用ConfigMap的限制条件
 
