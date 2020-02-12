@@ -1,0 +1,43 @@
+concurrent = 12
+check_interval = 0
+
+[session_server]
+  session_timeout = 1800
+
+[[runners]]
+  name = "zqg-beta-es-101"
+  url = "https://gitlab.innotechx.com/"
+  token = "ZYwW-hj281kXaoUo8dzb"
+  executor = "kubernetes"
+  output_limit = 40960
+  [runners.custom_build_dir]
+  [runners.cache]
+    [runners.cache.s3]
+    [runners.cache.gcs]
+  [runners.kubernetes.node_selector]
+    k8s-runner = "true"
+  [runners.kubernetes]
+    bearer_token_overwrite_allowed = false
+    host = "https://192.168.157.193:6443"
+    cert_file = "/etc/kubernetes/pki/apiserver-kubelet-client.crt"
+    key_file = "/etc/kubernetes/pki/apiserver-kubelet-client.key"
+    ca_file = "/etc/kubernetes/pki/apiserver.crt"
+    namespace = "gitlab-ci"
+    image = ""
+    helper_image = "docker-registry.shmiao.net/gitlab-ci/gitlab-runner-helper:x86_64-a987417a"
+    namespace_overwrite_allowed = ""
+    privileged = false
+    cpu_request = "4"
+    cpu_limit = "4"
+    memory_request = "200Mi"
+    pull_policy = "always"
+    image_pull_secrets = [
+        "regcred"
+    ]
+    service_account_overwrite_allowed = ""
+    pod_annotations_overwrite_allowed = ""
+    [runners.kubernetes.pod_security_context]
+    [runners.kubernetes.volumes]
+    [[runners.kubernetes.volumes.pvc]]
+        name = "gitlab-runner-cache"
+        mount_path = "/opt/cache"
