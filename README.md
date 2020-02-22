@@ -449,7 +449,7 @@ Ingress 按名字和暴露的端口检索正确的服务。在 Ingress 和 Servi
 我们已经知道 Servive 暴露一个 port。
 ```
 
-在实践过程中，我们应该可以看到如下所示的资源清单文件（下面代码中的 my-service 和 80）：
+在这个实践的过程中，我们应该可以看到如下所示的资源清单文件（下面代码中的 my-service 和 80）：
 
 ```yaml
 apiVersion: v1
